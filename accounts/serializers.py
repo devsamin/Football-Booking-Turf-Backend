@@ -30,10 +30,12 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
     def validate(self, data):
+        from django.contrib.auth import authenticate
         user = authenticate(email=data['email'], password=data['password'])
         if not user:
             raise serializers.ValidationError("Invalid credentials.")
-        return {"user": user} 
+        return {"user": user}
+
 
 
 class UserSerializer(serializers.ModelSerializer):

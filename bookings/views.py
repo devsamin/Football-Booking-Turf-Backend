@@ -28,14 +28,18 @@ class MyBookingListView(generics.ListAPIView):
 @api_view(['GET'])
 def bookings_by_date(request):
     date = request.GET.get("date")
-    bookings = Booking.objects.filter(date=date)
+
+    bookings = Booking.objects.filter(
+        date=date,
+        status__in=["pending", "confirmed"]   # cancelled যেন block না করে
+    )
 
     data = [
-    {
-        "start_time": b.start_time.strftime("%H:%M"),
-        "end_time": b.end_time.strftime("%H:%M"),
-    }
-    for b in bookings
+        {
+            "start_time": b.start_time.strftime("%H:%M"),
+            "end_time": b.end_time.strftime("%H:%M"),
+        }
+        for b in bookings
     ]
 
     return Response(data)

@@ -137,3 +137,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+SSLC_STORE_ID = "footb69a17d41af455"
+SSLC_STORE_PASS = "footb69a17d41af455@ssl"

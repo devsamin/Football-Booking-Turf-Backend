@@ -222,7 +222,7 @@ def bookings_by_date(request):
 # -----------------------------
 # Online Payment (SSLCommerz)
 # -----------------------------
-frontend_base_url = "http://localhost:5173/" 
+frontend_base_url = "http://localhost:5173" 
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def create_payment(request):
@@ -270,8 +270,8 @@ def create_payment(request):
         'currency': "BDT",
         'tran_id': transaction_id,
         'success_url': f"{frontend_base_url}/payment-success?tran_id={transaction_id}",
-        'fail_url': f"{frontend_base_url}/bookings?payment=failed&tran_id={transaction_id}",
-        'cancel_url': f"{frontend_base_url}/bookings?payment=cancel&tran_id={transaction_id}",
+        'fail_url': f"{frontend_base_url}/booking?payment=failed&tran_id={transaction_id}",
+        'cancel_url': f"{frontend_base_url}/booking?payment=cancel&tran_id={transaction_id}",
 
         'cus_name': request.user.username,
         'cus_email': request.user.email,

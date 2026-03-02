@@ -308,7 +308,6 @@ def bookings_by_date(request):
 #         booking.save()
 
 #     return Response({"message": "Payment successful"})
-
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt
@@ -321,7 +320,7 @@ from sslcommerz_lib import SSLCOMMERZ
 from .models import Booking
 from .serializers import BookingSerializer
 
-# --- ১. পেমেন্ট সেশন তৈরি করা ---
+# ১. পেমেন্ট সেশন তৈরি (এখানে Authentication লাগবে)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def create_payment(request):
@@ -337,10 +336,9 @@ def create_payment(request):
     }
     sslcz = SSLCOMMERZ(settings_dict)
 
-    # পেমেন্টের আগে পেন্ডিং বুকিং তৈরি
+    # পেন্ডিং বুকিং তৈরি
     for slot in slots:
         start, end = slot.split("-")
-        # প্রাইস ক্যালকুলেশন (আপনার লজিক অনুযায়ী)
         price = 1000 if start in ["06:00", "07:00"] else 1200 if start in ["08:00", "09:00"] else 1500
         
         Booking.objects.create(
@@ -359,7 +357,7 @@ def create_payment(request):
         'total_amount': total_amount,
         'currency': "BDT",
         'tran_id': transaction_id,
-        # এই URL গুলো অবশ্যই Backend এর হতে হবে (React এর নয়)
+        # এই লিঙ্কগুলো অবশ্যই আপনার Django সার্ভারের হতে হবে
         'success_url': "http://127.0.0.1:8000/api/bookings/payment-success/",
         'fail_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
         'cancel_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
@@ -374,11 +372,12 @@ def create_payment(request):
     response = sslcz.createSession(post_body)
     return Response({"payment_url": response["GatewayPageURL"]})
 
-# --- ২. পেমেন্ট সফল হলে রিডাইরেক্ট করা ---
+# ২. পেমেন্ট সফল হলে (এখানে Permission লাগবে না, কারণ SSLCommerz হিট করবে)
 @csrf_exempt
 @api_view(["POST"])
+@permission_classes([permissions.AllowAny]) # এটি যোগ করুন যাতে ৪০১ এরর না আসে
 def payment_success(request):
-    # SSLCommerz POST মেথডে ডাটা পাঠায়
+    # SSLCommerz ডাটা POST হিসেবে পাঠায়
     transaction_id = request.data.get("tran_id")
     
     if transaction_id:
@@ -388,14 +387,15 @@ def payment_success(request):
             booking.status = "confirmed"
             booking.save()
         
-        # 🔥 এটিই সবচেয়ে গুরুত্বপূর্ণ লাইন: Backend থেকে Frontend-এ পাঠানো
+        # 🔥 সরাসরি আপনার React অ্যাপে পাঠিয়ে দিন
         return HttpResponseRedirect(f"http://localhost:5173/payment-success?tran_id={transaction_id}")
     
     return HttpResponseRedirect("http://localhost:5173/booking?status=error")
 
-# --- ৩. পেমেন্ট ফেইল করলে ---
+# ৩. পেমেন্ট ফেইল করলে
 @csrf_exempt
 @api_view(["POST"])
+@permission_classes([permissions.AllowAny])
 def payment_fail(request):
     transaction_id = request.data.get("tran_id")
     Booking.objects.filter(transaction_id=transaction_id).delete()

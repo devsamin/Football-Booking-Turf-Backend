@@ -73,6 +73,15 @@ AUTHENTICATION_BACKENDS = [
     'accounts.authentication.EmailBackend',       # email support
 ]
 
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=5),   # access token 5 ঘন্টা থাকবে
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),   # refresh token 7 দিন থাকবে
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

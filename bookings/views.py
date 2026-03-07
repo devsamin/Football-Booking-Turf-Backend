@@ -203,10 +203,15 @@ class MyBookingListView(generics.ListAPIView):
 def bookings_by_date(request):
     date = request.GET.get("date")
 
+    # bookings = Booking.objects.filter(
+    #     date=date,
+    #     status__in=["pending", "confirmed"]  # cancelled block হবে না
+    # )
+    # update
     bookings = Booking.objects.filter(
-        date=date,
-        status__in=["pending", "confirmed"]  # cancelled block হবে না
-    )
+    date=date,
+    status__in=["pending", "confirmed"]
+    ).values("start_time", "end_time")
 
     data = [
         {

@@ -14,18 +14,26 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+from decouple import config
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-%@huy#*f$v=-_j1c0sq%*2_vl^+&z-kb((d-*aa5=(d4d8l-la'
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG = True
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = []
+# DEBUG = False
+DEBUG = config('DEBUG', default=False, cast=bool)
+
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    ".onrender.com"
+]
 
 
 # Application definition
@@ -145,8 +153,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
-SSLC_STORE_ID = "footb69a17d41af455"
-SSLC_STORE_PASS = "footb69a17d41af455@ssl"
+SSLC_STORE_ID = config('SSLC_STORE_ID')
+SSLC_STORE_PASS = config('SSLC_STORE_PASS')

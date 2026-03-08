@@ -42,3 +42,39 @@ class ProfileView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+    
+
+
+# for google login
+from rest_framework.decorators import api_view, permission_classes
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework import status
+
+User = get_user_model()
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def google_login(request):
+    email = request.data.get("email")
+    name = request.data.get("name")
+
+    if not email:
+        return Response({"error": "Email required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            "username": name if name else email.split("@")[0],
+            "phone": ""
+        }
+    )
+
+    refresh = RefreshToken.for_user(user)
+
+    return Response({
+        "message": "Google login successful",
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    })

@@ -1,20 +1,193 @@
-# # bookings/views.py
+# # # bookings/views.py
+# # from rest_framework import generics, permissions
+# # from .models import Booking
+# # from .serializers import BookingSerializer
+
+# # from rest_framework.decorators import api_view
+# # from rest_framework.response import Response
+# # from .models import Booking
+
+# # class BookingCreateView(generics.CreateAPIView):
+# #     serializer_class = BookingSerializer
+# #     permission_classes = [permissions.IsAuthenticated]
+
+# #     def perform_create(self, serializer):
+# #         serializer.save(user=self.request.user)
+
+
+# # class MyBookingListView(generics.ListAPIView):
+# #     serializer_class = BookingSerializer
+# #     permission_classes = [permissions.IsAuthenticated]
+
+# #     def get_queryset(self):
+# #         return Booking.objects.filter(user=self.request.user).order_by("-created_at")
+
+
+
+
+# # @api_view(['GET'])
+# # def bookings_by_date(request):
+# #     date = request.GET.get("date")
+
+# #     bookings = Booking.objects.filter(
+# #         date=date,
+# #         status__in=["pending", "confirmed"]   # cancelled যেন block না করে
+# #     )
+
+# #     data = [
+# #         {
+# #             "start_time": b.start_time.strftime("%H:%M"),
+# #             "end_time": b.end_time.strftime("%H:%M"),
+# #         }
+# #         for b in bookings
+# #     ]
+
+# #     return Response(data)
+
+
+
+# # from sslcommerz_lib import SSLCOMMERZ
+# # from django.conf import settings
+# # from uuid import uuid4
+# # from datetime import datetime
+# # from django.shortcuts import get_object_or_404
+# # from rest_framework.decorators import api_view, permission_classes
+
+
+# # @api_view(["POST"])
+# # @permission_classes([permissions.IsAuthenticated])
+# # def create_payment(request):
+
+# #     total_amount = request.data.get("total")
+# #     slots = request.data.get("slots")
+# #     date = request.data.get("date")
+
+# #     transaction_id = str(uuid4())
+
+# #     settings_dict = {
+# #         'store_id': settings.SSLC_STORE_ID,
+# #         'store_pass': settings.SSLC_STORE_PASS,
+# #         'issandbox': True
+# #     }
+
+# #     sslcz = SSLCOMMERZ(settings_dict)
+
+# #     # 🔥 Create temporary booking first
+# #     for slot in slots:
+# #         start, end = slot.split("-")
+
+# #         # 🔥 Backend price calculate
+# #         if start in ["06:00", "07:00"]:
+# #             price = 1000
+# #         elif start in ["08:00", "09:00"]:
+# #             price = 1200
+# #         else:
+# #             price = 1500
+
+# #         Booking.objects.create(
+# #             user=request.user,
+# #             date=date,
+# #             start_time=start,
+# #             end_time=end,
+# #             price=price,  # ✅ MUST
+# #             payment_method="online",
+# #             payment_status="unpaid",
+# #             status="pending",
+# #             transaction_id=transaction_id
+# #         )
+
+# #     post_body = {
+# #         'total_amount': total_amount,
+# #         'currency': "BDT",
+# #         'tran_id': transaction_id,
+# #         'success_url': "http://127.0.0.1:8000/api/bookings/payment-success/",
+# #         'fail_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
+# #         'cancel_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
+# #         'cus_name': request.user.username,
+# #         'cus_email': request.user.email,
+# #         'cus_phone': "01700000000",
+# #         'product_name': "Field Booking",
+# #         'product_category': "Booking",
+# #         'product_profile': "general",
+# #     }
+
+# #     response = sslcz.createSession(post_body)
+
+# #     if response.get("status") != "SUCCESS":
+# #         return Response({"error": "Payment session failed"}, status=400)
+
+# #     return Response({
+# #         "payment_url": response["GatewayPageURL"]
+# #     })
+
+
+# # # ✅ PAYMENT SUCCESS
+# # @api_view(["POST"])
+# # def payment_success(request):
+
+# #     transaction_id = request.data.get("tran_id")
+
+# #     bookings = Booking.objects.filter(transaction_id=transaction_id)
+
+# #     for booking in bookings:
+# #         booking.payment_status = "paid"
+# #         booking.status = "confirmed"
+# #         booking.save()
+
+# #     return Response({"message": "Payment successful"})
+
+
+# # # ❌ PAYMENT FAIL / CANCEL
+# # @api_view(["POST"])
+# # def payment_fail(request):
+
+# #     transaction_id = request.data.get("tran_id")
+
+# #     Booking.objects.filter(transaction_id=transaction_id).delete()
+
+# #     return Response({"message": "Payment failed, booking cancelled"})
+
+
+
+
+
 # from rest_framework import generics, permissions
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.response import Response
+# from django.conf import settings
+# from uuid import uuid4
+# from sslcommerz_lib import SSLCOMMERZ
 # from .models import Booking
 # from .serializers import BookingSerializer
 
-# from rest_framework.decorators import api_view
-# from rest_framework.response import Response
-# from .models import Booking
-
+# # -----------------------------
+# # Booking Create (Cash Booking)
+# # -----------------------------
 # class BookingCreateView(generics.CreateAPIView):
 #     serializer_class = BookingSerializer
 #     permission_classes = [permissions.IsAuthenticated]
 
 #     def perform_create(self, serializer):
-#         serializer.save(user=self.request.user)
+#         start = serializer.validated_data["start_time"]
 
+#         # Backend price calculation
+#         if start.strftime("%H:%M") in ["06:00", "07:00"]:
+#             price = 1000
+#         elif start.strftime("%H:%M") in ["08:00", "09:00"]:
+#             price = 1200
+#         else:
+#             price = 1500
 
+#         serializer.save(
+#             user=self.request.user,
+#             price=price,
+#             payment_method="cash",
+#             payment_status="unpaid"
+#         )
+
+# # -----------------------------
+# # List My Bookings
+# # -----------------------------
 # class MyBookingListView(generics.ListAPIView):
 #     serializer_class = BookingSerializer
 #     permission_classes = [permissions.IsAuthenticated]
@@ -23,45 +196,142 @@
 #         return Booking.objects.filter(user=self.request.user).order_by("-created_at")
 
 
-
-
+# # -----------------------------
+# # Bookings by Date (API)
+# # -----------------------------
 # @api_view(['GET'])
 # def bookings_by_date(request):
 #     date = request.GET.get("date")
 
 #     bookings = Booking.objects.filter(
 #         date=date,
-#         status__in=["pending", "confirmed"]   # cancelled যেন block না করে
+#         status__in=["pending", "confirmed"]  # cancelled block হবে না
 #     )
+#     # update
+#     # bookings = Booking.objects.filter(
+#     # date=date,
+#     # status__in=["pending", "confirmed"]
+#     # ).values("start_time", "end_time")
 
-#     data = [
-#         {
-#             "start_time": b.start_time.strftime("%H:%M"),
-#             "end_time": b.end_time.strftime("%H:%M"),
-#         }
-#         for b in bookings
-#     ]
+#     # data = [
+#     #     {
+#     #         "start_time": b.start_time.strftime("%H:%M"),
+#     #         "end_time": b.end_time.strftime("%H:%M"),
+#     #     }
+#     #     for b in bookings
+#     # ]
 
-#     return Response(data)
+#     # return Response(data)
 
 
+# # -----------------------------
+# # Online Payment (SSLCommerz)
+# # -----------------------------
+# # frontend_base_url = "http://localhost:5173" 
+# # @api_view(["POST"])
+# # @permission_classes([permissions.IsAuthenticated])
+# # def create_payment(request):
+# #     total_amount = request.data.get("total")
+# #     slots = request.data.get("slots")
+# #     date = request.data.get("date")
 
-# from sslcommerz_lib import SSLCOMMERZ
+# #     transaction_id = str(uuid4())
+
+# #     settings_dict = {
+# #         'store_id': settings.SSLC_STORE_ID,
+# #         'store_pass': settings.SSLC_STORE_PASS,
+# #         'issandbox': True
+# #     }
+
+# #     sslcz = SSLCOMMERZ(settings_dict)
+
+# #     # Temporary booking creation
+# #     for slot in slots:
+# #         start, end = slot.split("-")
+
+# #         # Backend price calculate
+# #         if start in ["06:00", "07:00"]:
+# #             price = 1000
+# #         elif start in ["08:00", "09:00"]:
+# #             price = 1200
+# #         else:
+# #             price = 1500
+
+# #         Booking.objects.create(
+# #             user=request.user,
+# #             date=date,
+# #             start_time=start,
+# #             end_time=end,
+# #             price=price,          # MUST
+# #             payment_method="online",
+# #             payment_status="unpaid",
+# #             status="pending",
+# #             transaction_id=transaction_id
+# #         )
+
+# #     # SSLCommerz payload
+# #     post_body = {
+# #         'total_amount': total_amount,
+# #         'currency': "BDT",
+# #         'tran_id': transaction_id,
+# #         # 'success_url': f"{frontend_base_url}/payment-success?tran_id={transaction_id}",
+# #         # 'fail_url': f"{frontend_base_url}/booking?payment=failed&tran_id={transaction_id}",
+# #         # 'cancel_url': f"{frontend_base_url}/booking?payment=cancel&tran_id={transaction_id}",
+# #         'success_url': f"{frontend_base_url}/payment-success",
+# #         'fail_url': f"{frontend_base_url}/booking",
+# #         'cancel_url': f"{frontend_base_url}/booking",
+
+# #         'cus_name': request.user.username,
+# #         'cus_email': request.user.email,
+# #         'cus_phone': "01700000000",
+# #         'product_name': "Field Booking",
+# #         'product_category': "Booking",
+# #         'product_profile': "general",
+# #     }
+
+# #     response = sslcz.createSession(post_body)
+
+# #     if response.get("status") != "SUCCESS":
+# #         return Response({"error": "Payment session failed"}, status=400)
+
+# #     return Response({
+# #         "payment_url": response["GatewayPageURL"]
+# #     })
+
+
+# # # -----------------------------
+# # # Payment Success
+# # # -----------------------------
+# # @api_view(["POST"])
+# # def payment_success(request):
+# #     transaction_id = request.data.get("tran_id")
+# #     bookings = Booking.objects.filter(transaction_id=transaction_id)
+
+# #     for booking in bookings:
+# #         booking.payment_status = "paid"
+# #         booking.status = "confirmed"
+# #         booking.save()
+
+# #     return Response({"message": "Payment successful"})
+# from django.shortcuts import redirect
+# from django.http import HttpResponseRedirect
+# from django.views.decorators.csrf import csrf_exempt
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.response import Response
+# from rest_framework import permissions, generics
 # from django.conf import settings
 # from uuid import uuid4
-# from datetime import datetime
-# from django.shortcuts import get_object_or_404
-# from rest_framework.decorators import api_view, permission_classes
+# from sslcommerz_lib import SSLCOMMERZ
+# from .models import Booking
+# from .serializers import BookingSerializer
 
-
+# # ১. পেমেন্ট সেশন তৈরি (এখানে Authentication লাগবে)
 # @api_view(["POST"])
 # @permission_classes([permissions.IsAuthenticated])
 # def create_payment(request):
-
 #     total_amount = request.data.get("total")
 #     slots = request.data.get("slots")
 #     date = request.data.get("date")
-
 #     transaction_id = str(uuid4())
 
 #     settings_dict = {
@@ -69,27 +339,19 @@
 #         'store_pass': settings.SSLC_STORE_PASS,
 #         'issandbox': True
 #     }
-
 #     sslcz = SSLCOMMERZ(settings_dict)
 
-#     # 🔥 Create temporary booking first
+#     # পেন্ডিং বুকিং তৈরি
 #     for slot in slots:
 #         start, end = slot.split("-")
-
-#         # 🔥 Backend price calculate
-#         if start in ["06:00", "07:00"]:
-#             price = 1000
-#         elif start in ["08:00", "09:00"]:
-#             price = 1200
-#         else:
-#             price = 1500
-
+#         price = 1000 if start in ["06:00", "07:00"] else 1200 if start in ["08:00", "09:00"] else 1500
+        
 #         Booking.objects.create(
 #             user=request.user,
 #             date=date,
 #             start_time=start,
 #             end_time=end,
-#             price=price,  # ✅ MUST
+#             price=price,
 #             payment_method="online",
 #             payment_status="unpaid",
 #             status="pending",
@@ -100,6 +362,7 @@
 #         'total_amount': total_amount,
 #         'currency': "BDT",
 #         'tran_id': transaction_id,
+#         # এই লিঙ্কগুলো অবশ্যই আপনার Django সার্ভারের হতে হবে
 #         'success_url': "http://127.0.0.1:8000/api/bookings/payment-success/",
 #         'fail_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
 #         'cancel_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
@@ -107,73 +370,70 @@
 #         'cus_email': request.user.email,
 #         'cus_phone': "01700000000",
 #         'product_name': "Field Booking",
-#         'product_category': "Booking",
+#         'product_category': "Sports",
 #         'product_profile': "general",
 #     }
 
 #     response = sslcz.createSession(post_body)
+#     return Response({"payment_url": response["GatewayPageURL"]})
 
-#     if response.get("status") != "SUCCESS":
-#         return Response({"error": "Payment session failed"}, status=400)
-
-#     return Response({
-#         "payment_url": response["GatewayPageURL"]
-#     })
-
-
-# # ✅ PAYMENT SUCCESS
+# # ২. পেমেন্ট সফল হলে (এখানে Permission লাগবে না, কারণ SSLCommerz হিট করবে)
+# @csrf_exempt
 # @api_view(["POST"])
+# @permission_classes([permissions.AllowAny]) # এটি যোগ করুন যাতে ৪০১ এরর না আসে
 # def payment_success(request):
-
+#     # SSLCommerz ডাটা POST হিসেবে পাঠায়
 #     transaction_id = request.data.get("tran_id")
+    
+#     if transaction_id:
+#         bookings = Booking.objects.filter(transaction_id=transaction_id)
+#         for booking in bookings:
+#             booking.payment_status = "paid"
+#             booking.status = "confirmed"
+#             booking.save()
+        
+#         # 🔥 সরাসরি আপনার React অ্যাপে পাঠিয়ে দিন
+#         return HttpResponseRedirect(f"http://localhost:5173/payment-success?tran_id={transaction_id}")
+    
+#     return HttpResponseRedirect("http://localhost:5173/booking?status=error")
 
-#     bookings = Booking.objects.filter(transaction_id=transaction_id)
-
-#     for booking in bookings:
-#         booking.payment_status = "paid"
-#         booking.status = "confirmed"
-#         booking.save()
-
-#     return Response({"message": "Payment successful"})
-
-
-# # ❌ PAYMENT FAIL / CANCEL
+# # ৩. পেমেন্ট ফেইল করলে
+# @csrf_exempt
 # @api_view(["POST"])
+# @permission_classes([permissions.AllowAny])
 # def payment_fail(request):
-
 #     transaction_id = request.data.get("tran_id")
-
 #     Booking.objects.filter(transaction_id=transaction_id).delete()
-
-#     return Response({"message": "Payment failed, booking cancelled"})
-
-
-
+#     return HttpResponseRedirect("http://localhost:5173/booking?status=failed")
 
 
 from rest_framework import generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponseRedirect
 from uuid import uuid4
 from sslcommerz_lib import SSLCOMMERZ
+
 from .models import Booking
 from .serializers import BookingSerializer
 
-# -----------------------------
-# Booking Create (Cash Booking)
-# -----------------------------
+
+# --------------------------------
+# Cash Booking
+# --------------------------------
 class BookingCreateView(generics.CreateAPIView):
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        start = serializer.validated_data["start_time"]
 
-        # Backend price calculation
-        if start.strftime("%H:%M") in ["06:00", "07:00"]:
+        start = serializer.validated_data["start_time"].strftime("%H:%M")
+
+        if start in ["06:00", "07:00"]:
             price = 1000
-        elif start.strftime("%H:%M") in ["08:00", "09:00"]:
+        elif start in ["08:00", "09:00"]:
             price = 1200
         else:
             price = 1500
@@ -182,170 +442,81 @@ class BookingCreateView(generics.CreateAPIView):
             user=self.request.user,
             price=price,
             payment_method="cash",
-            payment_status="unpaid"
+            payment_status="unpaid",
+            status="pending"
         )
 
-# -----------------------------
-# List My Bookings
-# -----------------------------
+
+# --------------------------------
+# My Bookings List
+# --------------------------------
 class MyBookingListView(generics.ListAPIView):
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Booking.objects.filter(user=self.request.user).order_by("-created_at")
+        return Booking.objects.filter(
+            user=self.request.user
+        ).order_by("-created_at")
 
 
-# -----------------------------
-# Bookings by Date (API)
-# -----------------------------
-@api_view(['GET'])
+# --------------------------------
+# Booked Slots by Date
+# --------------------------------
+@api_view(["GET"])
 def bookings_by_date(request):
+
     date = request.GET.get("date")
 
-    # bookings = Booking.objects.filter(
-    #     date=date,
-    #     status__in=["pending", "confirmed"]  # cancelled block হবে না
-    # )
-    # update
     bookings = Booking.objects.filter(
-    date=date,
-    status__in=["pending", "confirmed"]
-    ).values("start_time", "end_time")
+        date=date,
+        status__in=["pending", "confirmed"]
+    )
 
     data = [
         {
-            "start_time": b.start_time.strftime("%H:%M"),
-            "end_time": b.end_time.strftime("%H:%M"),
+            "start_time": booking.start_time.strftime("%H:%M"),
+            "end_time": booking.end_time.strftime("%H:%M"),
         }
-        for b in bookings
+        for booking in bookings
     ]
 
     return Response(data)
 
 
-# -----------------------------
-# Online Payment (SSLCommerz)
-# -----------------------------
-# frontend_base_url = "http://localhost:5173" 
-# @api_view(["POST"])
-# @permission_classes([permissions.IsAuthenticated])
-# def create_payment(request):
-#     total_amount = request.data.get("total")
-#     slots = request.data.get("slots")
-#     date = request.data.get("date")
-
-#     transaction_id = str(uuid4())
-
-#     settings_dict = {
-#         'store_id': settings.SSLC_STORE_ID,
-#         'store_pass': settings.SSLC_STORE_PASS,
-#         'issandbox': True
-#     }
-
-#     sslcz = SSLCOMMERZ(settings_dict)
-
-#     # Temporary booking creation
-#     for slot in slots:
-#         start, end = slot.split("-")
-
-#         # Backend price calculate
-#         if start in ["06:00", "07:00"]:
-#             price = 1000
-#         elif start in ["08:00", "09:00"]:
-#             price = 1200
-#         else:
-#             price = 1500
-
-#         Booking.objects.create(
-#             user=request.user,
-#             date=date,
-#             start_time=start,
-#             end_time=end,
-#             price=price,          # MUST
-#             payment_method="online",
-#             payment_status="unpaid",
-#             status="pending",
-#             transaction_id=transaction_id
-#         )
-
-#     # SSLCommerz payload
-#     post_body = {
-#         'total_amount': total_amount,
-#         'currency': "BDT",
-#         'tran_id': transaction_id,
-#         # 'success_url': f"{frontend_base_url}/payment-success?tran_id={transaction_id}",
-#         # 'fail_url': f"{frontend_base_url}/booking?payment=failed&tran_id={transaction_id}",
-#         # 'cancel_url': f"{frontend_base_url}/booking?payment=cancel&tran_id={transaction_id}",
-#         'success_url': f"{frontend_base_url}/payment-success",
-#         'fail_url': f"{frontend_base_url}/booking",
-#         'cancel_url': f"{frontend_base_url}/booking",
-
-#         'cus_name': request.user.username,
-#         'cus_email': request.user.email,
-#         'cus_phone': "01700000000",
-#         'product_name': "Field Booking",
-#         'product_category': "Booking",
-#         'product_profile': "general",
-#     }
-
-#     response = sslcz.createSession(post_body)
-
-#     if response.get("status") != "SUCCESS":
-#         return Response({"error": "Payment session failed"}, status=400)
-
-#     return Response({
-#         "payment_url": response["GatewayPageURL"]
-#     })
-
-
-# # -----------------------------
-# # Payment Success
-# # -----------------------------
-# @api_view(["POST"])
-# def payment_success(request):
-#     transaction_id = request.data.get("tran_id")
-#     bookings = Booking.objects.filter(transaction_id=transaction_id)
-
-#     for booking in bookings:
-#         booking.payment_status = "paid"
-#         booking.status = "confirmed"
-#         booking.save()
-
-#     return Response({"message": "Payment successful"})
-from django.shortcuts import redirect
-from django.http import HttpResponseRedirect
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import permissions, generics
-from django.conf import settings
-from uuid import uuid4
-from sslcommerz_lib import SSLCOMMERZ
-from .models import Booking
-from .serializers import BookingSerializer
-
-# ১. পেমেন্ট সেশন তৈরি (এখানে Authentication লাগবে)
+# --------------------------------
+# Create Online Payment
+# --------------------------------
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def create_payment(request):
+
     total_amount = request.data.get("total")
     slots = request.data.get("slots")
     date = request.data.get("date")
+
     transaction_id = str(uuid4())
 
     settings_dict = {
-        'store_id': settings.SSLC_STORE_ID,
-        'store_pass': settings.SSLC_STORE_PASS,
-        'issandbox': True
+        "store_id": settings.SSLC_STORE_ID,
+        "store_pass": settings.SSLC_STORE_PASS,
+        "issandbox": True
     }
+
     sslcz = SSLCOMMERZ(settings_dict)
 
-    # পেন্ডিং বুকিং তৈরি
+    # create pending booking
     for slot in slots:
+
         start, end = slot.split("-")
-        price = 1000 if start in ["06:00", "07:00"] else 1200 if start in ["08:00", "09:00"] else 1500
-        
+
+        if start in ["06:00", "07:00"]:
+            price = 1000
+        elif start in ["08:00", "09:00"]:
+            price = 1200
+        else:
+            price = 1500
+
         Booking.objects.create(
             user=request.user,
             date=date,
@@ -359,49 +530,72 @@ def create_payment(request):
         )
 
     post_body = {
-        'total_amount': total_amount,
-        'currency': "BDT",
-        'tran_id': transaction_id,
-        # এই লিঙ্কগুলো অবশ্যই আপনার Django সার্ভারের হতে হবে
-        'success_url': "http://127.0.0.1:8000/api/bookings/payment-success/",
-        'fail_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
-        'cancel_url': "http://127.0.0.1:8000/api/bookings/payment-fail/",
-        'cus_name': request.user.username,
-        'cus_email': request.user.email,
-        'cus_phone': "01700000000",
-        'product_name': "Field Booking",
-        'product_category': "Sports",
-        'product_profile': "general",
+        "total_amount": total_amount,
+        "currency": "BDT",
+        "tran_id": transaction_id,
+
+        "success_url": "http://127.0.0.1:8000/api/bookings/payment-success/",
+        "fail_url": "http://127.0.0.1:8000/api/bookings/payment-fail/",
+        "cancel_url": "http://127.0.0.1:8000/api/bookings/payment-fail/",
+
+        "cus_name": request.user.username,
+        "cus_email": request.user.email,
+        "cus_phone": "01700000000",
+
+        "product_name": "Football Turf Booking",
+        "product_category": "Sports",
+        "product_profile": "general",
     }
 
     response = sslcz.createSession(post_body)
-    return Response({"payment_url": response["GatewayPageURL"]})
 
-# ২. পেমেন্ট সফল হলে (এখানে Permission লাগবে না, কারণ SSLCommerz হিট করবে)
+    if response.get("status") != "SUCCESS":
+        return Response({"error": "Payment session failed"}, status=400)
+
+    return Response({
+        "payment_url": response["GatewayPageURL"]
+    })
+
+
+# --------------------------------
+# Payment Success
+# --------------------------------
 @csrf_exempt
 @api_view(["POST"])
-@permission_classes([permissions.AllowAny]) # এটি যোগ করুন যাতে ৪০১ এরর না আসে
+@permission_classes([permissions.AllowAny])
 def payment_success(request):
-    # SSLCommerz ডাটা POST হিসেবে পাঠায়
+
     transaction_id = request.data.get("tran_id")
-    
+
     if transaction_id:
+
         bookings = Booking.objects.filter(transaction_id=transaction_id)
+
         for booking in bookings:
             booking.payment_status = "paid"
             booking.status = "confirmed"
             booking.save()
-        
-        # 🔥 সরাসরি আপনার React অ্যাপে পাঠিয়ে দিন
-        return HttpResponseRedirect(f"http://localhost:5173/payment-success?tran_id={transaction_id}")
-    
+
+        return HttpResponseRedirect(
+            f"http://localhost:5173/payment-success?tran_id={transaction_id}"
+        )
+
     return HttpResponseRedirect("http://localhost:5173/booking?status=error")
 
-# ৩. পেমেন্ট ফেইল করলে
+
+# --------------------------------
+# Payment Fail
+# --------------------------------
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def payment_fail(request):
+
     transaction_id = request.data.get("tran_id")
-    Booking.objects.filter(transaction_id=transaction_id).delete()
-    return HttpResponseRedirect("http://localhost:5173/booking?status=failed")
+
+    if transaction_id:
+        Booking.objects.filter(transaction_id=transaction_id).delete()
+
+    return HttpResponseRedirect(
+        "http://localhost:5173/booking?status=failed"
+    )

@@ -52,9 +52,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',   # 🔥 একদম উপরে
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -64,7 +64,8 @@ MIDDLEWARE = [
 ]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "https://football-booking-turf-frontend-13xs.vercel.app",
@@ -79,9 +80,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    # "DEFAULT_PERMISSION_CLASSES": (
+    #     "rest_framework.permissions.IsAuthenticated",
+    # ),
+    "DEFAULT_PERMISSION_CLASSES " : (
+    "rest_framework.permissions.AllowAny",
+)
 }
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # default (username)

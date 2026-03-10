@@ -67,7 +67,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "https://your-frontend-url.vercel.app",
+    "https://football-booking-turf-frontend-13xs.vercel.app",
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
